@@ -5,9 +5,6 @@ import User from "@/models/User";
 import Wallet from "@/models/Wallet";
 import bcrypt from "bcryptjs";
 
-const WELCOME_BONUS = 1000;
-const WELCOME_BONUS_ENABLED = true;
-
 export async function POST(request) {
   const session = await mongoose.startSession();
 
@@ -25,10 +22,7 @@ export async function POST(request) {
 
     if (password.length < 6) {
       return Response.json(
-        {
-          success: false,
-          message: "Password must be at least 6 characters",
-        },
+        { success: false, message: "Password must be at least 6 characters" },
         { status: 400 }
       );
     }
@@ -65,23 +59,13 @@ export async function POST(request) {
 
       createdUser = user;
 
-      const bonusEnabled = WELCOME_BONUS_ENABLED;
-
       await Wallet.create(
         [
           {
             user: user._id,
-            balance: bonusEnabled ? WELCOME_BONUS : 0,
-            welcomeBonusGranted: bonusEnabled,
-            transactions: bonusEnabled
-              ? [
-                  {
-                    type: "credit",
-                    amount: WELCOME_BONUS,
-                    description: "RideGlow Welcome Bonus",
-                  },
-                ]
-              : [],
+            balance: 0,
+            welcomeBonusGranted: false,
+            transactions: [],
           },
         ],
         { session }
@@ -91,7 +75,7 @@ export async function POST(request) {
     return Response.json(
       {
         success: true,
-        message: "Registration successful. ₹1,000 welcome bonus added!",
+        message: "Registration successful!",
         user: {
           id: createdUser._id,
           name: createdUser.name,
