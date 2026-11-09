@@ -1,10 +1,26 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 export default function BookingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#f7f8f5]">
+          <p className="text-lg font-semibold text-[#55745f]">
+            Loading vehicle...
+          </p>
+        </div>
+      }
+    >
+      <BookingContent />
+    </Suspense>
+  );
+}
+
+function BookingContent() {
   const { id } = useParams();
   const router = useRouter();
 
@@ -35,7 +51,9 @@ export default function BookingPage() {
       }
     };
 
-    fetchVehicle();
+    if (id) {
+      fetchVehicle();
+    }
   }, [id]);
 
   if (loading) {
@@ -117,7 +135,6 @@ export default function BookingPage() {
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-10 md:px-8">
       <div className="mx-auto max-w-6xl">
-
         <button
           onClick={() => router.push("/bikes")}
           className="mb-7 font-semibold text-[#55745f] hover:text-[#344d3b]"
@@ -126,9 +143,7 @@ export default function BookingPage() {
         </button>
 
         <div className="grid gap-8 lg:grid-cols-2">
-
           <section className="rounded-3xl bg-white p-4 shadow-xl shadow-gray-200/50 md:p-6">
-
             <div className="relative overflow-hidden rounded-2xl bg-[#edf2ec]">
               {images.length > 0 ? (
                 <img
@@ -213,7 +228,6 @@ export default function BookingPage() {
           </section>
 
           <section className="h-fit rounded-3xl bg-white p-6 shadow-xl shadow-gray-200/50 md:p-8">
-
             <p className="text-sm font-bold uppercase tracking-widest text-[#78947d]">
               RideGlow Booking
             </p>
@@ -270,7 +284,9 @@ export default function BookingPage() {
 
             <div className="mt-8 space-y-4 rounded-2xl bg-[#f5f8f4] p-5">
               <div className="flex justify-between text-gray-600">
-                <span>Price per {type === "hourly" ? "hour" : "day"}</span>
+                <span>
+                  Price per {type === "hourly" ? "hour" : "day"}
+                </span>
                 <span className="font-semibold">₹{price}</span>
               </div>
 
