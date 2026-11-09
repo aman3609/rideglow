@@ -43,7 +43,11 @@ export async function POST(request) {
       email: email.trim().toLowerCase(),
     });
 
-    if (!user || !user.resetPasswordOTPHash || !user.resetPasswordOTPExpires) {
+    if (
+      !user ||
+      !user.resetPasswordOTPHash ||
+      !user.resetPasswordOTPExpires
+    ) {
       return NextResponse.json(
         { message: "Invalid or expired OTP" },
         { status: 400 }
@@ -62,7 +66,10 @@ export async function POST(request) {
       .update(otp)
       .digest();
 
-    const storedHash = Buffer.from(user.resetPasswordOTPHash, "hex");
+    const storedHash = Buffer.from(
+      user.resetPasswordOTPHash,
+      "hex"
+    );
 
     if (
       storedHash.length !== submittedHash.length ||

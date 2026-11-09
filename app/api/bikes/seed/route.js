@@ -1,17 +1,60 @@
+
+import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Bike from "@/models/Bike";
+import User from "@/models/User";
+import jwt from "jsonwebtoken";
 
-export async function POST() {
+async function verifyAdmin(request) {
+  const authHeader = request.headers.get("authorization");
+
+  if (!authHeader?.startsWith("Bearer ")) return null;
+
+  try {
+    const decoded = jwt.verify(
+      authHeader.split(" ")[1],
+      process.env.JWT_SECRET
+    );
+
+    const userId = decoded.id || decoded.userId || decoded._id;
+
+    if (!userId) return null;
+
+    const user = await User.findById(userId);
+
+    if (!user || user.role !== "admin" || user.isBlocked) {
+      return null;
+    }
+
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function POST(request) {
   try {
     await connectDB();
+
+    const admin = await verifyAdmin(request);
+
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, message: "Admin access required" },
+        { status: 403 }
+      );
+    }
 
     const existingBikes = await Bike.countDocuments();
 
     if (existingBikes > 0) {
-      return Response.json({
-        success: false,
-        message: "Bikes already exist",
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Bikes already exist",
+        },
+        { status: 409 }
+      );
     }
 
     const bikes = await Bike.insertMany([
@@ -41,14 +84,16 @@ export async function POST() {
       },
     ]);
 
-    return Response.json({
+    return NextResponse.json({
       success: true,
       message: "Bikes added successfully",
       bikes,
     });
   } catch (error) {
-    return Response.json(
-      { success: false, message: error.message },
+    console.error("Bike seed error:", error);
+
+    return NextResponse.json(
+      { success: false, message: "Failed to seed bikes" },
       { status: 500 }
     );
   }

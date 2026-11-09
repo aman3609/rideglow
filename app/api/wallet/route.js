@@ -3,15 +3,26 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import connectDB from "@/lib/mongodb";
 import Wallet from "@/models/Wallet";
+import User from "@/models/User";
 
 async function getAuthenticatedUser(request) {
-  const token = request.headers.get("authorization")?.split(" ")[1];
+  const authHeader = request.headers.get("authorization");
 
-  if (!token) return null;
+  if (!authHeader?.startsWith("Bearer ")) return null;
 
   try {
+    const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return decoded;
+
+    const userId = decoded.id || decoded.userId || decoded._id;
+
+    if (!userId) return null;
+
+    const user = await User.findById(userId);
+
+    if (!user || user.isBlocked) return null;
+
+    return user;
   } catch {
     return null;
   }
@@ -21,28 +32,19 @@ export async function GET(request) {
   try {
     await connectDB();
 
-    const decoded = await getAuthenticatedUser(request);
+    const user = await getAuthenticatedUser(request);
 
-    if (!decoded) {
+    if (!user) {
       return NextResponse.json(
-        { message: "Unauthorized" },
+        { success: false, message: "Unauthorized or account blocked" },
         { status: 401 }
       );
     }
 
-    const userId = decoded.id || decoded.userId || decoded._id;
-
-    if (!userId) {
-      return NextResponse.json(
-        { message: "Invalid authentication token" },
-        { status: 401 }
-      );
-    }
-
-    let wallet = await Wallet.findOne({ user: userId });
+    let wallet = await Wallet.findOne({ user: user._id });
 
     if (!wallet) {
-      wallet = await Wallet.create({ user: userId });
+      wallet = await Wallet.create({ user: user._id });
     }
 
     return NextResponse.json({

@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import jwt from "jsonwebtoken";
 import { Readable } from "stream";
-
+import connectDB from "@/lib/mongodb";
+import User from "@/models/User";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -32,6 +33,8 @@ async function uploadToCloudinary(file) {
 
 export async function POST(request) {
   try {
+    await connectDB();
+
     const authHeader = request.headers.get("authorization");
 
     if (!authHeader?.startsWith("Bearer ")) {
@@ -41,8 +44,10 @@ export async function POST(request) {
       );
     }
 
+    let decoded;
+
     try {
-      jwt.verify(
+      decoded = jwt.verify(
         authHeader.split(" ")[1],
         process.env.JWT_SECRET
       );
@@ -50,6 +55,24 @@ export async function POST(request) {
       return NextResponse.json(
         { message: "Invalid or expired token" },
         { status: 401 }
+      );
+    }
+
+    const userId = decoded.id || decoded.userId || decoded._id;
+
+    if (!userId) {
+      return NextResponse.json(
+        { message: "Invalid user token" },
+        { status: 401 }
+      );
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user || user.isBlocked) {
+      return NextResponse.json(
+        { message: "Your account is blocked or unavailable" },
+        { status: 403 }
       );
     }
 

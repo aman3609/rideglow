@@ -13,21 +13,44 @@ export async function POST(request) {
 
     const { name, email, password, phone } = await request.json();
 
-    if (!name?.trim() || !email?.trim() || !password || !phone?.trim()) {
+    if (
+      typeof name !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      typeof phone !== "string" ||
+      !name.trim() ||
+      !email.trim() ||
+      !password ||
+      !phone.trim()
+    ) {
       return Response.json(
         { success: false, message: "All fields are required" },
         { status: 400 }
       );
     }
 
-    if (password.length < 6) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return Response.json(
-        { success: false, message: "Password must be at least 6 characters" },
+        { success: false, message: "Invalid email address" },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    if (password.length < 8) {
+      return Response.json(
+        { success: false, message: "Password must be at least 8 characters" },
+        { status: 400 }
+      );
+    }
+
+    if (password.length > 128) {
+      return Response.json(
+        { success: false, message: "Password cannot exceed 128 characters" },
+        { status: 400 }
+      );
+    }
 
     const existingUser = await User.findOne({
       email: normalizedEmail,
@@ -40,7 +63,7 @@ export async function POST(request) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     let createdUser;
 

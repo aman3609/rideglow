@@ -19,7 +19,15 @@ async function getAuthenticatedUser(request) {
       process.env.JWT_SECRET
     );
 
-    return await User.findById(decoded.id);
+    const userId = decoded.id || decoded.userId || decoded._id;
+
+    if (!userId) return null;
+
+    const user = await User.findById(userId);
+
+    if (!user || user.isBlocked) return null;
+
+    return user;
   } catch {
     return null;
   }
@@ -33,7 +41,7 @@ export async function GET(request) {
 
     if (!user) {
       return NextResponse.json(
-        { message: "Please login first" },
+        { message: "Please login first or check your account status" },
         { status: 401 }
       );
     }
@@ -61,7 +69,7 @@ export async function POST(request) {
 
     if (!user) {
       return NextResponse.json(
-        { message: "Please login first" },
+        { message: "Please login first or check your account status" },
         { status: 401 }
       );
     }
@@ -146,7 +154,7 @@ export async function PATCH(request) {
 
     if (!user) {
       return NextResponse.json(
-        { message: "Please login first" },
+        { message: "Please login first or check your account status" },
         { status: 401 }
       );
     }
@@ -228,7 +236,7 @@ export async function DELETE(request) {
 
     if (!user) {
       return NextResponse.json(
-        { message: "Please login first" },
+        { message: "Please login first or check your account status" },
         { status: 401 }
       );
     }
@@ -316,7 +324,6 @@ export async function DELETE(request) {
         await rental.save({ session });
       }
 
-      // Keep the vehicle and its booking history in the database.
       vehicle.status = "removed";
       await vehicle.save({ session });
     });

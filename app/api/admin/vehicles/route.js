@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import Vehicle from "@/models/Vehicle";
@@ -13,9 +14,16 @@ async function verifyAdmin(request) {
   try {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
 
-    if (!user || user.role !== "admin") return null;
+    const userId = decoded.id || decoded.userId || decoded._id;
+
+    if (!userId) return null;
+
+    const user = await User.findById(userId);
+
+    if (!user || user.role !== "admin" || user.isBlocked) {
+      return null;
+    }
 
     return user;
   } catch {
@@ -38,10 +46,21 @@ export async function GET(request) {
 
     const vehicles = await Vehicle.find({
       approvalStatus: "pending",
-    }).populate("owner", "name email phone");
+    })
+      .populate("owner", "name email phone isBlocked")
+      .sort({ createdAt: -1 });
 
-    return NextResponse.json({ vehicles });
+    const filteredVehicles = vehicles.filter(
+      (vehicle) => vehicle.owner && !vehicle.owner.isBlocked
+    );
+
+    return NextResponse.json({
+      success: true,
+      vehicles: filteredVehicles,
+    });
   } catch (error) {
+    console.error("Admin vehicles GET:", error);
+
     return NextResponse.json(
       { message: "Failed to fetch vehicles" },
       { status: 500 }
@@ -64,19 +83,35 @@ export async function PATCH(request) {
 
     const { vehicleId, action } = await request.json();
 
-    if (!vehicleId || !["approve", "reject"].includes(action)) {
+    if (
+      !vehicleId ||
+      !mongoose.Types.ObjectId.isValid(vehicleId) ||
+      !["approve", "reject"].includes(action)
+    ) {
       return NextResponse.json(
         { message: "Invalid request" },
         { status: 400 }
       );
     }
 
-    const vehicle = await Vehicle.findById(vehicleId);
+    const vehicle = await Vehicle.findOne({
+      _id: vehicleId,
+      approvalStatus: "pending",
+    });
 
-    if (!vehicle || vehicle.approvalStatus !== "pending") {
+    if (!vehicle) {
       return NextResponse.json(
         { message: "Pending vehicle not found" },
         { status: 404 }
+      );
+    }
+
+    const owner = await User.findById(vehicle.owner);
+
+    if (!owner || owner.isBlocked) {
+      return NextResponse.json(
+        { message: "Vehicle owner is blocked or unavailable" },
+        { status: 403 }
       );
     }
 
@@ -86,9 +121,12 @@ export async function PATCH(request) {
     await vehicle.save();
 
     return NextResponse.json({
+      success: true,
       message: `Vehicle ${action}d successfully`,
     });
   } catch (error) {
+    console.error("Admin vehicles PATCH:", error);
+
     return NextResponse.json(
       { message: "Failed to update vehicle" },
       { status: 500 }

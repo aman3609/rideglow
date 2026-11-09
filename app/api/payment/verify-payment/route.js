@@ -4,21 +4,22 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import connectDB from "@/lib/mongodb";
 import Wallet from "@/models/Wallet";
+import User from "@/models/User";
 
 export async function POST(request) {
   try {
     await connectDB();
 
-    const token = request.headers
-      .get("authorization")
-      ?.split(" ")[1];
+    const authHeader = request.headers.get("authorization");
 
-    if (!token) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json(
         { message: "Please login first" },
         { status: 401 }
       );
     }
+
+    const token = authHeader.split(" ")[1];
 
     let decoded;
 
@@ -37,6 +38,15 @@ export async function POST(request) {
       return NextResponse.json(
         { message: "Invalid user token" },
         { status: 401 }
+      );
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return NextResponse.json(
+        { message: "User account not found" },
+        { status: 404 }
       );
     }
 

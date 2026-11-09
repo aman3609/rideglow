@@ -1,3 +1,4 @@
+
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import bcrypt from "bcryptjs";
@@ -16,12 +17,24 @@ export async function POST(request) {
       );
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+    });
 
     if (!user) {
       return Response.json(
         { success: false, message: "Invalid email or password" },
         { status: 401 }
+      );
+    }
+
+    if (user.isBlocked) {
+      return Response.json(
+        {
+          success: false,
+          message: "Your account has been blocked. Please contact support.",
+        },
+        { status: 403 }
       );
     }
 
@@ -52,8 +65,10 @@ export async function POST(request) {
       },
     });
   } catch (error) {
+    console.error("Login error:", error);
+
     return Response.json(
-      { success: false, message: error.message },
+      { success: false, message: "Login failed. Please try again." },
       { status: 500 }
     );
   }

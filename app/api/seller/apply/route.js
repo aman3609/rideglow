@@ -1,3 +1,4 @@
+
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
@@ -8,23 +9,49 @@ export async function POST(request) {
 
     const authHeader = request.headers.get("authorization");
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return Response.json(
         { success: false, message: "Please login first" },
         { status: 401 }
       );
     }
 
-    const token = authHeader.split(" ")[1];
+    let decoded;
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    try {
+      decoded = jwt.verify(
+        authHeader.split(" ")[1],
+        process.env.JWT_SECRET
+      );
+    } catch {
+      return Response.json(
+        { success: false, message: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
 
-    const user = await User.findById(decoded.id);
+    const userId = decoded.id || decoded.userId || decoded._id;
+
+    if (!userId) {
+      return Response.json(
+        { success: false, message: "Invalid user token" },
+        { status: 401 }
+      );
+    }
+
+    const user = await User.findById(userId);
 
     if (!user) {
       return Response.json(
         { success: false, message: "User not found" },
         { status: 404 }
+      );
+    }
+
+    if (user.isBlocked) {
+      return Response.json(
+        { success: false, message: "Your account is blocked" },
+        { status: 403 }
       );
     }
 
@@ -62,9 +89,11 @@ export async function POST(request) {
       { status: 200 }
     );
   } catch (error) {
+    console.error("Seller application error:", error);
+
     return Response.json(
-      { success: false, message: "Invalid or expired token" },
-      { status: 401 }
+      { success: false, message: "Unable to submit seller application" },
+      { status: 500 }
     );
   }
 }

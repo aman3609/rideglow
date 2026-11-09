@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import jwt from "jsonwebtoken";
 import connectDB from "@/lib/mongodb";
+import User from "@/models/User";
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -13,11 +14,9 @@ export async function POST(request) {
   try {
     await connectDB();
 
-    const token = request.headers
-      .get("authorization")
-      ?.split(" ")[1];
+    const authHeader = request.headers.get("authorization");
 
-    if (!token) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json(
         { message: "Please login first" },
         { status: 401 }
@@ -27,6 +26,7 @@ export async function POST(request) {
     let decoded;
 
     try {
+      const token = authHeader.split(" ")[1];
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch {
       return NextResponse.json(
@@ -41,6 +41,15 @@ export async function POST(request) {
       return NextResponse.json(
         { message: "Invalid user token" },
         { status: 401 }
+      );
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user || user.isBlocked) {
+      return NextResponse.json(
+        { message: "Your account is blocked or unavailable" },
+        { status: 403 }
       );
     }
 

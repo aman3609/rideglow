@@ -13,7 +13,10 @@ export async function POST(request) {
 
     const { email } = await request.json();
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (
+      typeof email !== "string" ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    ) {
       return NextResponse.json(
         { message: "Please enter a valid email address" },
         { status: 400 }
@@ -40,7 +43,9 @@ export async function POST(request) {
       .digest("hex");
 
     user.resetPasswordOTPHash = otpHash;
-    user.resetPasswordOTPExpires = new Date(Date.now() + 5 * 60 * 1000);
+    user.resetPasswordOTPExpires = new Date(
+      Date.now() + 5 * 60 * 1000
+    );
 
     await user.save();
 

@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
@@ -31,6 +30,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["none", "pending", "approved", "rejected"],
       default: "none",
+    },
+    isBlocked: {
+      type: Boolean,
+      default: false,
     },
     resetPasswordOTPHash: {
       type: String,

@@ -1,6 +1,8 @@
+
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 async function verifyAdmin(request) {
   const authHeader = request.headers.get("authorization");
@@ -13,9 +15,13 @@ async function verifyAdmin(request) {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.id);
+    const userId = decoded.id || decoded.userId || decoded._id;
 
-    if (!user || user.role !== "admin") {
+    if (!userId) return null;
+
+    const user = await User.findById(userId);
+
+    if (!user || user.role !== "admin" || user.isBlocked) {
       return null;
     }
 
@@ -27,6 +33,8 @@ async function verifyAdmin(request) {
 
 export async function GET(request) {
   try {
+    await connectDB();
+
     const admin = await verifyAdmin(request);
 
     if (!admin) {
@@ -36,17 +44,18 @@ export async function GET(request) {
       );
     }
 
-    await connectDB();
-
     const sellers = await User.find({
       sellerStatus: "pending",
-    }).select("-password");
+      isBlocked: { $ne: true },
+    }).select("-password -resetPasswordOTPHash -resetPasswordOTPExpires");
 
     return Response.json({
       success: true,
       sellers,
     });
   } catch (error) {
+    console.error("Admin sellers GET:", error);
+
     return Response.json(
       { success: false, message: "Failed to fetch sellers" },
       { status: 500 }
@@ -56,6 +65,8 @@ export async function GET(request) {
 
 export async function PATCH(request) {
   try {
+    await connectDB();
+
     const admin = await verifyAdmin(request);
 
     if (!admin) {
@@ -65,11 +76,13 @@ export async function PATCH(request) {
       );
     }
 
-    await connectDB();
-
     const { sellerId, action } = await request.json();
 
-    if (!sellerId || !["approve", "reject"].includes(action)) {
+    if (
+      !sellerId ||
+      !mongoose.Types.ObjectId.isValid(sellerId) ||
+      !["approve", "reject"].includes(action)
+    ) {
       return Response.json(
         { success: false, message: "Invalid request" },
         { status: 400 }
@@ -79,6 +92,7 @@ export async function PATCH(request) {
     const seller = await User.findOne({
       _id: sellerId,
       sellerStatus: "pending",
+      isBlocked: { $ne: true },
     });
 
     if (!seller) {
@@ -104,6 +118,8 @@ export async function PATCH(request) {
       sellerStatus: seller.sellerStatus,
     });
   } catch (error) {
+    console.error("Admin sellers PATCH:", error);
+
     return Response.json(
       { success: false, message: "Seller approval failed" },
       { status: 500 }

@@ -16,7 +16,13 @@ async function getAuthenticatedUser(request) {
   try {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return await User.findById(decoded.id);
+    const user = await User.findById(decoded.id);
+
+    if (!user || user.isBlocked) {
+      return null;
+    }
+
+    return user;
   } catch {
     return null;
   }
